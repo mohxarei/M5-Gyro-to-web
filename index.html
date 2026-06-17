@@ -12,7 +12,7 @@
     position: absolute; top: 0; left: 0; right: 0;
     display: flex; align-items: center; justify-content: space-between;
     padding: 10px 16px;
-    background: rgba(10,10,20,0.4);
+    background: rgba(10,10,20,0.75);
     backdrop-filter: blur(6px);
     border-bottom: 1px solid rgba(255,255,255,0.07);
     z-index: 10;
@@ -22,15 +22,15 @@
   #wifi-dot.on { background: #2ecc71; box-shadow: 0 0 8px #2ecc71; }
   #wifi-label { color: #ff3b3b; transition: color 0.4s; }
   #wifi-label.on { color: #2ecc71; }
-  #title-center { font-size: 12px; color: rgba(255,255,255,0.6); letter-spacing: 0.12em; text-transform: uppercase; }
-  #battery { display: flex; align-items: center; gap: 6px; font-size: 12px; color: rgba(255,255,255,0.7); }
-  #battery-bar { width: 28px; height: 13px; border: 1.5px solid rgba(255,255,255,0.5); border-radius: 2px; overflow: hidden; }
+  #title-center { font-size: 12px; color: rgba(255,255,255,0.3); letter-spacing: 0.12em; text-transform: uppercase; }
+  #battery { display: flex; align-items: center; gap: 6px; font-size: 12px; color: rgba(255,255,255,0.5); }
+  #battery-bar { width: 28px; height: 13px; border: 1.5px solid rgba(255,255,255,0.3); border-radius: 2px; overflow: hidden; }
   #battery-fill { height: 100%; width: 70%; background: #2ecc71; transition: width 0.5s, background 0.5s; border-radius: 1px; }
   #battery-pct { font-size: 11px; min-width: 28px; text-align: right; }
   #bottombar {
     position: absolute; bottom: 0; left: 0; right: 0;
     padding: 10px 20px;
-    background: rgba(10,10,20,0.4);
+    background: rgba(10,10,20,0.75);
     backdrop-filter: blur(6px);
     border-top: 1px solid rgba(255,255,255,0.07);
     z-index: 10;
@@ -42,14 +42,14 @@
   .axis-label.y { color: #4dff88; }
   .axis-label.z { color: #4d9fff; }
   .axis-num { font-size: 15px; min-width: 62px; }
-  .axis-unit { font-size: 10px; color: rgba(255,255,255,0.5); }
+  .axis-unit { font-size: 10px; color: rgba(255,255,255,0.3); }
   #color-badge {
     font-size: 12px; padding: 3px 10px; border-radius: 4px;
     font-weight: 700; letter-spacing: 0.08em;
     transition: background 0.3s, color 0.3s;
-    background: rgba(255,255,255,0.2); color: #fff;
+    background: rgba(255,255,255,0.1); color: #fff;
   }
-  #last-update { font-size: 11px; color: rgba(255,255,255,0.5); }
+  #last-update { font-size: 11px; color: rgba(255,255,255,0.25); }
 </style>
 </head>
 <body>
@@ -60,7 +60,7 @@
     <div id="wifi-dot"></div>
     <span id="wifi-label">Disconnected</span>
   </div>
-  <div id="title-center">M5Stick · Ocean Stream</div>
+  <div id="title-center">M5Stick · Gyro Globe</div>
   <div id="battery">
     <div id="battery-bar"><div id="battery-fill"></div></div>
     <span id="battery-pct">—</span>
@@ -94,58 +94,89 @@ const canvas = document.getElementById('c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.25;
+renderer.toneMappingExposure = 1.2;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x79b3e3); 
-scene.fog = new THREE.Fog(0x79b3e3, 4, 18);
+scene.fog = new THREE.Fog(0x79b3e3, 4, 15);
 
-// Lower camera perspective to view the horizon line straight across the fluid plane
-const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
-camera.position.set(0, 0.6, 4.2);
-camera.lookAt(0, 0.4, -2);
+// Adjusted camera slightly to see the ocean surface depth properly
+const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
+camera.position.set(0, 0.8, 4.5);
+camera.lookAt(0, 0.3, -2);
 
-// High fidelity outdoor illumination engines
-scene.add(new THREE.AmbientLight(0xdbe9f6, 1.8));
-const sunLight = new THREE.DirectionalLight(0xffffff, 4.0);
-sunLight.position.set(-6, 12, 8); 
-scene.add(sunLight);
+// Outdoor lighting configuration to make liquid bright and reflective
+scene.add(new THREE.AmbientLight(0xdbe9f6, 1.5));
+const dLight = new THREE.DirectionalLight(0xffffff, 3.0);
+dLight.position.set(-5, 10, 5);
+scene.add(dLight);
 
-// Setup group containing the ball structure
 const deviceGroup = new THREE.Group();
 scene.add(deviceGroup);
 
-// --- Procedural Generation of the 6-Striped Beach Ball Texture ---
-const texCanvas = document.createElement('canvas');
-texCanvas.width = 1024; texCanvas.height = 512;
-const ctx = texCanvas.getContext('2d');
-const hexColors = ['#e6c800', '#1c5cb8', '#d62424', '#ab24bd', '#21b53b', '#ffffff'];
-const segmentWidth = texCanvas.width / 6;
-for (let i = 0; i < 6; i++) {
-    ctx.fillStyle = hexColors[i];
-    ctx.fillRect(i * segmentWidth, 0, segmentWidth, texCanvas.height);
+// Wireframe sphere (YOUR ORIGINAL)
+let sphereColor = new THREE.Color(0x00ffff);
+const sphereGeo = new THREE.SphereGeometry(1.3, 24, 16);
+let sphereMat = new THREE.MeshBasicMaterial({ color: sphereColor, wireframe: true, transparent: true, opacity: 0.6 });
+const sphere = new THREE.Mesh(sphereGeo, sphereMat);
+deviceGroup.add(sphere);
+
+// Inner dark sphere (YOUR ORIGINAL)
+const innerMesh = new THREE.Mesh(
+  new THREE.SphereGeometry(1.28, 24, 16),
+  new THREE.MeshPhongMaterial({ color: 0x050510, transparent: true, opacity: 0.85 })
+);
+deviceGroup.add(innerMesh);
+
+// Equator (YOUR ORIGINAL)
+const torusGeo = new THREE.TorusGeometry(1.3, 0.007, 8, 80);
+let equatorMat = new THREE.MeshBasicMaterial({ color: sphereColor, transparent: true, opacity: 0.9 });
+const equator = new THREE.Mesh(torusGeo, equatorMat);
+deviceGroup.add(equator);
+const meridian = new THREE.Mesh(torusGeo.clone(), equatorMat.clone());
+meridian.rotation.y = Math.PI / 2;
+deviceGroup.add(meridian);
+
+// Axis arrows (YOUR ORIGINAL)
+function makeAxis(color, dir, len) {
+  const mat = new THREE.LineBasicMaterial({ color, linewidth: 2 });
+  const geo = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(0,0,0),
+    dir.clone().multiplyScalar(len)
+  ]);
+  return new THREE.Line(geo, mat);
 }
-ctx.fillStyle = '#ffffff';
-ctx.beginPath(); ctx.arc(texCanvas.width/2, 0, 45, 0, Math.PI*2); ctx.fill();
-ctx.beginPath(); ctx.arc(texCanvas.width/2, texCanvas.height, 45, 0, Math.PI*2); ctx.fill();
+deviceGroup.add(makeAxis(0xff3333, new THREE.Vector3(1,0,0), 1.9));
+deviceGroup.add(makeAxis(0x33ff66, new THREE.Vector3(0,1,0), 1.9));
+deviceGroup.add(makeAxis(0x3388ff, new THREE.Vector3(0,0,1), 1.9));
 
-const ballTexture = new THREE.CanvasTexture(texCanvas);
-ballTexture.wrapS = THREE.RepeatWrapping;
+// Labels (YOUR ORIGINAL)
+function makeLabel(text, color, pos) {
+  const c = document.createElement('canvas');
+  c.width = 64; c.height = 64;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = color;
+  ctx.font = 'bold 44px monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, 32, 32);
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true }));
+  sprite.scale.set(0.32, 0.32, 1);
+  sprite.position.copy(pos);
+  return sprite;
+}
+deviceGroup.add(makeLabel('X','#ff4444', new THREE.Vector3(2.1,0,0)));
+deviceGroup.add(makeLabel('Y','#44ff88', new THREE.Vector3(0,2.1,0)));
+deviceGroup.add(makeLabel('Z','#4499ff', new THREE.Vector3(0,0,2.1)));
 
-// Replace old wireframe with realistic vinyl beach ball mesh
-const ballGeometry = new THREE.SphereGeometry(0.65, 64, 64);
-const ballMaterial = new THREE.MeshStandardMaterial({ map: ballTexture, roughness: 0.12, metalness: 0.02 });
-const ballMesh = new THREE.Mesh(ballGeometry, ballMaterial);
-deviceGroup.add(ballMesh);
-
-// --- High Fidelity Transparent Water Plane ---
-const waterGeometry = new THREE.PlaneGeometry(40, 40, 180, 180);
+// --- New Wavy Liquid Ocean Surface Mesh ---
+const waterGeometry = new THREE.PlaneGeometry(40, 40, 150, 150);
 const waterMaterial = new THREE.MeshStandardMaterial({ 
   color: 0x367ca8, 
   roughness: 0.02, 
   metalness: 0.1, 
   transparent: true, 
-  opacity: 0.72 
+  opacity: 0.75 
 });
 const waterMesh = new THREE.Mesh(waterGeometry, waterMaterial);
 waterMesh.rotation.x = -Math.PI / 2;
@@ -155,18 +186,19 @@ const posAttr = waterGeometry.attributes.position;
 const baseZ = [];
 for (let i = 0; i < posAttr.count; i++) { baseZ.push(posAttr.getZ(i)); }
 
-// Rotation & Physics state tracker
+// Rotation state variables (YOUR ORIGINAL)
 const rot = { x:0, y:0, z:0 };
 const smooth = { x:0, y:0, z:0 };
-let pos = { x: -0.9, z: -1.2 }; 
-let vel = { x: 0, z: 0 };
-
 let lastT = performance.now();
 let gx=0, gy=0, gz=0;
 const DEG2RAD = Math.PI/180;
 
 function setColor(hex) {
-  // Keeps your background badge logic intact
+  const c = new THREE.Color(hex);
+  sphereMat.color = c;
+  equatorMat.color = c;
+  meridian.material.color = c;
+  // color badge (YOUR ORIGINAL)
   const badge = document.getElementById('color-badge');
   badge.style.background = hex;
   const dark = isDark(hex);
@@ -180,7 +212,7 @@ function isDark(hex) {
   return (r*299 + g*587 + b*114)/1000 < 128;
 }
 
-// MQTT configuration completely untouched
+// MQTT Configuration (YOUR ORIGINAL)
 const TOPIC = 'm5stick/gyro/mydevice123';
 const client = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {
   clientId: 'globe_' + Math.random().toString(16).substr(2,6),
@@ -235,28 +267,18 @@ function animate() {
   lastT = now;
   const elapsed = now / 1000;
 
-  // 1. Fluid Dynamics Layer Calculations (Ripples)
+  // 1. Calculate Real-time Ocean Ripples
   for (let i = 0; i < posAttr.count; i++) {
     const vx = posAttr.getX(i); const vy = posAttr.getY(i);
-    const layer1 = Math.sin(vx * 0.5 + elapsed * 1.6) * 0.08;
-    const layer2 = Math.cos(vy * 0.4 + elapsed * 1.2) * 0.06;
-    const layer3 = Math.sin((vx + vy) * 0.8 + elapsed * 2.2) * 0.02;
-    posAttr.setZ(i, baseZ[i] + layer1 + layer2 + layer3);
+    const wave1 = Math.sin(vx * 0.5 + elapsed * 1.6) * 0.08;
+    const wave2 = Math.cos(vy * 0.4 + elapsed * 1.2) * 0.06;
+    const wave3 = Math.sin((vx + vy) * 0.8 + elapsed * 2.2) * 0.02;
+    posAttr.setZ(i, baseZ[i] + wave1 + wave2 + wave3);
   }
   waterGeometry.computeVertexNormals();
   waterGeometry.attributes.position.needsUpdate = true;
 
-  // 2. Translational Physics Logic (Roll steers X, Pitch steers Z)
-  vel.x += gy * 0.03 * dt; 
-  vel.z += gx * 0.03 * dt;
-  vel.x *= 0.94; vel.z *= 0.94; // Ocean drag friction
-  pos.x += vel.x; pos.z += vel.z;
-
-  // Keep within visible lens range bounds
-  pos.x = Math.max(-2.5, Math.min(2.5, pos.x));
-  pos.z = Math.max(-5, Math.min(-0.8, pos.z));
-
-  // 3. Absolute System Rotation Integration
+  // 2. Gyro Rotation Physics (YOUR ORIGINAL)
   rot.x += gx * DEG2RAD * dt;
   rot.y += gy * DEG2RAD * dt;
   rot.z += gz * DEG2RAD * dt;
@@ -264,15 +286,14 @@ function animate() {
   smooth.x = lerp(smooth.x, rot.x, 0.1);
   smooth.y = lerp(smooth.y, rot.y, 0.1);
   smooth.z = lerp(smooth.z, rot.z, 0.1);
+
   deviceGroup.rotation.set(smooth.x, smooth.y, smooth.z);
 
-  // 4. Float Height Submersion Optimization
-  const waveY = Math.sin(pos.x * 0.5 + elapsed * 1.6) * 0.08 + Math.cos(pos.z * 0.4 + elapsed * 1.2) * 0.06;
-  deviceGroup.position.x = pos.x;
-  deviceGroup.position.z = pos.z;
-  deviceGroup.position.y = waveY + 0.18; // Submerges the bottom safely beneath translucent layer
+  // 3. Float Bobbing Logic (Stays in center, but bobs vertically over waves)
+  const centralWaveHeight = Math.sin(0 * 0.5 + elapsed * 1.6) * 0.08 + Math.cos(0 * 0.4 + elapsed * 1.2) * 0.06;
+  deviceGroup.position.set(0, centralWaveHeight + 0.25, -1.2); 
 
-  // Responsive Layout Scaling Handler
+  // Responsive Layout (YOUR ORIGINAL)
   const w = canvas.clientWidth, h = canvas.clientHeight;
   if (canvas.width !== w || canvas.height !== h) {
     renderer.setSize(w, h, false);
