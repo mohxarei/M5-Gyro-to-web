@@ -100,12 +100,12 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x79b3e3); 
 scene.fog = new THREE.Fog(0x79b3e3, 4, 15);
 
-// Adjusted camera slightly to see the ocean surface depth properly
+// Adjusted camera perspective slightly to view water surface properly
 const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
 camera.position.set(0, 0.8, 4.5);
 camera.lookAt(0, 0.3, -2);
 
-// Outdoor lighting configuration to make liquid bright and reflective
+// Bright direct and ambient light to make the water look realistic
 scene.add(new THREE.AmbientLight(0xdbe9f6, 1.5));
 const dLight = new THREE.DirectionalLight(0xffffff, 3.0);
 dLight.position.set(-5, 10, 5);
@@ -114,21 +114,21 @@ scene.add(dLight);
 const deviceGroup = new THREE.Group();
 scene.add(deviceGroup);
 
-// Wireframe sphere (YOUR ORIGINAL)
+// Wireframe sphere
 let sphereColor = new THREE.Color(0x00ffff);
 const sphereGeo = new THREE.SphereGeometry(1.3, 24, 16);
 let sphereMat = new THREE.MeshBasicMaterial({ color: sphereColor, wireframe: true, transparent: true, opacity: 0.6 });
 const sphere = new THREE.Mesh(sphereGeo, sphereMat);
 deviceGroup.add(sphere);
 
-// Inner dark sphere (YOUR ORIGINAL)
+// Inner dark sphere
 const innerMesh = new THREE.Mesh(
   new THREE.SphereGeometry(1.28, 24, 16),
   new THREE.MeshPhongMaterial({ color: 0x050510, transparent: true, opacity: 0.85 })
 );
 deviceGroup.add(innerMesh);
 
-// Equator (YOUR ORIGINAL)
+// Equator
 const torusGeo = new THREE.TorusGeometry(1.3, 0.007, 8, 80);
 let equatorMat = new THREE.MeshBasicMaterial({ color: sphereColor, transparent: true, opacity: 0.9 });
 const equator = new THREE.Mesh(torusGeo, equatorMat);
@@ -137,7 +137,7 @@ const meridian = new THREE.Mesh(torusGeo.clone(), equatorMat.clone());
 meridian.rotation.y = Math.PI / 2;
 deviceGroup.add(meridian);
 
-// Axis arrows (YOUR ORIGINAL)
+// Axis arrows
 function makeAxis(color, dir, len) {
   const mat = new THREE.LineBasicMaterial({ color, linewidth: 2 });
   const geo = new THREE.BufferGeometry().setFromPoints([
@@ -150,7 +150,7 @@ deviceGroup.add(makeAxis(0xff3333, new THREE.Vector3(1,0,0), 1.9));
 deviceGroup.add(makeAxis(0x33ff66, new THREE.Vector3(0,1,0), 1.9));
 deviceGroup.add(makeAxis(0x3388ff, new THREE.Vector3(0,0,1), 1.9));
 
-// Labels (YOUR ORIGINAL)
+// Labels
 function makeLabel(text, color, pos) {
   const c = document.createElement('canvas');
   c.width = 64; c.height = 64;
@@ -169,7 +169,7 @@ deviceGroup.add(makeLabel('X','#ff4444', new THREE.Vector3(2.1,0,0)));
 deviceGroup.add(makeLabel('Y','#44ff88', new THREE.Vector3(0,2.1,0)));
 deviceGroup.add(makeLabel('Z','#4499ff', new THREE.Vector3(0,0,2.1)));
 
-// --- New Wavy Liquid Ocean Surface Mesh ---
+// --- Wavy Water Surface Mesh ---
 const waterGeometry = new THREE.PlaneGeometry(40, 40, 150, 150);
 const waterMaterial = new THREE.MeshStandardMaterial({ 
   color: 0x367ca8, 
@@ -186,7 +186,7 @@ const posAttr = waterGeometry.attributes.position;
 const baseZ = [];
 for (let i = 0; i < posAttr.count; i++) { baseZ.push(posAttr.getZ(i)); }
 
-// Rotation state variables (YOUR ORIGINAL)
+// Rotation state
 const rot = { x:0, y:0, z:0 };
 const smooth = { x:0, y:0, z:0 };
 let lastT = performance.now();
@@ -198,7 +198,7 @@ function setColor(hex) {
   sphereMat.color = c;
   equatorMat.color = c;
   meridian.material.color = c;
-  // color badge (YOUR ORIGINAL)
+  // color badge
   const badge = document.getElementById('color-badge');
   badge.style.background = hex;
   const dark = isDark(hex);
@@ -212,7 +212,7 @@ function isDark(hex) {
   return (r*299 + g*587 + b*114)/1000 < 128;
 }
 
-// MQTT Configuration (YOUR ORIGINAL)
+// MQTT
 const TOPIC = 'm5stick/gyro/mydevice123';
 const client = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {
   clientId: 'globe_' + Math.random().toString(16).substr(2,6),
@@ -267,7 +267,7 @@ function animate() {
   lastT = now;
   const elapsed = now / 1000;
 
-  // 1. Calculate Real-time Ocean Ripples
+  // 1. Fluid Dynamics Ripple Calculation
   for (let i = 0; i < posAttr.count; i++) {
     const vx = posAttr.getX(i); const vy = posAttr.getY(i);
     const wave1 = Math.sin(vx * 0.5 + elapsed * 1.6) * 0.08;
@@ -278,7 +278,7 @@ function animate() {
   waterGeometry.computeVertexNormals();
   waterGeometry.attributes.position.needsUpdate = true;
 
-  // 2. Gyro Rotation Physics (YOUR ORIGINAL)
+  // 2. Gyro Rotation Physics
   rot.x += gx * DEG2RAD * dt;
   rot.y += gy * DEG2RAD * dt;
   rot.z += gz * DEG2RAD * dt;
@@ -289,11 +289,10 @@ function animate() {
 
   deviceGroup.rotation.set(smooth.x, smooth.y, smooth.z);
 
-  // 3. Float Bobbing Logic (Stays in center, but bobs vertically over waves)
+  // 3. Floating Physics Logic (Bobs vertically on the water's surface center point)
   const centralWaveHeight = Math.sin(0 * 0.5 + elapsed * 1.6) * 0.08 + Math.cos(0 * 0.4 + elapsed * 1.2) * 0.06;
-  deviceGroup.position.set(0, centralWaveHeight + 0.25, -1.2); 
+  deviceGroup.position.set(0, centralWaveHeight + 0.25, -1.2);
 
-  // Responsive Layout (YOUR ORIGINAL)
   const w = canvas.clientWidth, h = canvas.clientHeight;
   if (canvas.width !== w || canvas.height !== h) {
     renderer.setSize(w, h, false);
