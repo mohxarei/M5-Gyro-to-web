@@ -26,14 +26,15 @@
         </div>
         <div style="display: flex; justify-content: space-between;">
             <div class="hud-panel">
-                <span>X: <span id="val-x">0.0</span></span>
-                <span>Y: <span id="val-y">0.0</span></span>
-                <span>Z: <span id="val-z">0.0</span></span>
+                <span>PITCH: <span id="val-x">0.0</span></span>
+                <span>ROLL: <span id="val-y">0.0</span></span>
+                <span>YAW: <span id="val-z">0.0</span></span>
             </div>
         </div>
     </div>
 
     <script>
+        // --- 1. Scene & Camera Position ---
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x79b3e3); 
         scene.fog = new THREE.Fog(0x79b3e3, 4, 18);
@@ -48,11 +49,13 @@
         camera.position.set(0, 0.6, 4.2); 
         camera.lookAt(0, 0.4, -2);
 
+        // --- 2. Lighting ---
         scene.add(new THREE.AmbientLight(0xdbe9f6, 1.8));
         const sunLight = new THREE.DirectionalLight(0xffffff, 4.0);
         sunLight.position.set(-6, 12, 8); 
         scene.add(sunLight);
 
+        // --- 3. Beach Ball Texture ---
         const canvas = document.createElement('canvas');
         canvas.width = 1024; canvas.height = 512;
         const ctx = canvas.getContext('2d');
@@ -72,6 +75,7 @@
         const ballMesh = new THREE.Mesh(ballGeometry, ballMaterial);
         scene.add(ballMesh);
 
+        // --- 4. Water Surface ---
         const waterGeometry = new THREE.PlaneGeometry(40, 40, 200, 200);
         const waterMaterial = new THREE.MeshStandardMaterial({ color: 0x367ca8, roughness: 0.02, metalness: 0.1, transparent: true, opacity: 0.72 });
         const waterMesh = new THREE.Mesh(waterGeometry, waterMaterial);
@@ -82,7 +86,8 @@
         const baseZ = [];
         for (let i = 0; i < posAttr.count; i++) { baseZ.push(posAttr.getZ(i)); }
 
-        let gyro = { x: 0, y: 0, z: 0 };
+        // --- 5. Movement Physics ---
+        let gyro = { pitch: 0, roll: 0, yaw: 0 };
         let pos = { x: -0.9, z: -1.2 };
         let vel = { x: 0, z: 0 };
         const clock = new THREE.Clock();
@@ -101,15 +106,18 @@
             waterGeometry.computeVertexNormals();
             waterGeometry.attributes.position.needsUpdate = true;
 
-            vel.x += gyro.y * 0.0005; vel.z += gyro.x * 0.0005;
+            // Roll moves left/right, Pitch moves forward/back
+            vel.x += gyro.roll * 0.0005; 
+            vel.z += gyro.pitch * 0.0005;
             vel.x *= 0.93; vel.z *= 0.93;
             pos.x += vel.x; pos.z += vel.z;
             pos.x = Math.max(-2.5, Math.min(2.5, pos.x));
             pos.z = Math.max(-5, Math.min(-0.8, pos.z));
 
-            ballMesh.rotation.x += (gyro.x * 0.01745) / 60;
-            ballMesh.rotation.y += (gyro.y * 0.01745) / 60;
-            ballMesh.rotation.z += (gyro.z * 0.01745) / 60;
+            // Spin the ball mesh
+            ballMesh.rotation.x += (gyro.pitch * 0.01745) / 60;
+            ballMesh.rotation.y += (gyro.roll * 0.01745) / 60;
+            ballMesh.rotation.z += (gyro.dash * 0.01745) / 60;
 
             const currentWaveHeight = Math.sin(pos.x * 0.5 + elapsed * 1.6) * 0.08 + Math.cos(pos.z * 0.4 + elapsed * 1.2) * 0.06;
             ballMesh.position.x = pos.x; ballMesh.position.z = pos.z;
@@ -125,7 +133,8 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
-        // CONNECT TO SECURE PORT AND PROPER TOPIC
+        // --- 6. MQTT Connection Setup ---
+        // Matches the secure configuration from your working layout exactly
         const client = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {
             clientId: 'globe_' + Math.random().toString(16).substr(2,6),
             keepalive: 30, reconnectPeriod: 2000
@@ -134,21 +143,27 @@
         client.on('connect', () => {
             document.getElementById('status-dot').className = 'dot connected';
             document.getElementById('status-text').innerText = "STREAM ACTIVE";
-            client.subscribe("m5stick/gyro/mohxarei"); // Matches original stick topic
+            client.subscribe("m5stick/gyro/mydevice123"); // Exact topic from your M5 code
+        });
+
+        client.on('close', () => {
+            document.getElementById('status-dot').className = 'dot';
+            document.getElementById('status-text').innerText = "DISCONNECTED";
         });
 
         client.on('message', (topic, message) => {
             try {
                 const data = JSON.parse(message.toString());
-                // Reads x, y, z format from standard firmware configuration
-                gyro.x = data.x || 0;
-                gyro.y = data.y || 0;
-                gyro.z = data.z || 0;
+                
+                // Matches your exact M5 packet variables: pitch, roll, yaw, bat
+                gyro.pitch = data.pitch || 0;
+                gyro.roll  = data.roll || 0;
+                gyro.yaw   = data.yaw || 0;
 
-                document.getElementById('val-x').innerText = gyro.x.toFixed(1);
-                document.getElementById('val-y').innerText = gyro.y.toFixed(1);
-                document.getElementById('val-z').innerText = gyro.z.toFixed(1);
-                document.getElementById('bat-val').innerText = data.battery || '--';
+                document.getElementById('val-x').innerText = gyro.pitch.toFixed(1);
+                document.getElementById('val-y').innerText = gyro.roll.toFixed(1);
+                document.getElementById('val-z').innerText = gyro.yaw.toFixed(1);
+                document.getElementById('bat-val').innerText = data.bat !== undefined ? data.bat : '--';
             } catch (e) { console.error(e); }
         });
     </script>
