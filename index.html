@@ -3,211 +3,117 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>M5Stick Beach Ball Ocean Visualizer</title>
+    <title>M5Stick Photo-Realistic Beach Ball Ocean</title>
     <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            background-color: #7ec0ee; /* Sky blue background */
-            font-family: 'Courier New', Courier, monospace;
-            color: #ffffff;
-        }
-        #ui-layer {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            padding: 20px;
-            box-sizing: border-box;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            z-index: 10;
-        }
-        .header, .footer {
-            display: flex;
-            justify-content: space-between;
-            background: rgba(255, 255, 255, 0.2);
-            padding: 10px;
-            border-radius: 8px;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            backdrop-filter: blur(5px);
-            pointer-events: auto;
-            color: #0c335e;
-            font-weight: bold;
-        }
-        .indicator {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background-color: #ff3b30;
-            display: inline-block;
-            margin-right: 8px;
-            box-shadow: 0 0 8px #ff3b30;
-        }
-        .indicator.connected {
-            background-color: #00b33c;
-            box-shadow: 0 0 8px #00b33c;
-        }
-        .metric { margin-right: 15px; }
+        body { margin: 0; overflow: hidden; background-color: #79b3e3; font-family: 'Courier New', Courier, monospace; }
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; padding: 20px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; z-index: 10; }
+        .hud-panel { background: rgba(255, 255, 255, 0.15); padding: 8px 15px; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.25); backdrop-filter: blur(8px); color: #0d2a4a; font-weight: bold; display: flex; gap: 20px; pointer-events: auto; font-size: 13px; }
+        .dot { width: 10px; height: 10px; border-radius: 50%; background-color: #ff3b30; display: inline-block; box-shadow: 0 0 8px #ff3b30; align-self: center; }
+        .dot.connected { background-color: #24e589; box-shadow: 0 0 10px #24e589; }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
 </head>
 <body>
 
     <div id="ui-layer">
-        <div class="header">
-            <div style="display: flex; align-items: center;">
-                <div id="status-dot" class="indicator"></div>
-                <span id="status-text">WAITING FOR M5STICK...</span>
+        <div style="display: flex; justify-content: space-between;">
+            <div class="hud-panel">
+                <div id="status-dot" class="dot"></div>
+                <span id="status-text">CONNECTING TO M5...</span>
             </div>
-            <div>BATTERY: <span id="bat-val">--</span>%</div>
+            <div class="hud-panel">BATT: <span id="bat-val">--</span>%</div>
         </div>
-        <div class="footer">
-            <div>
-                <span class="metric">X: <span id="val-x">0.0</span></span>
-                <span class="metric">Y: <span id="val-y">0.0</span></span>
-                <span class="metric">Z: <span id="val-z">0.0</span></span>
+        <div style="display: flex; justify-content: space-between;">
+            <div class="hud-panel">
+                <span>X: <span id="val-x">0.0</span></span>
+                <span>Y: <span id="val-y">0.0</span></span>
+                <span>Z: <span id="val-z">0.0</span></span>
             </div>
-            <div>STATUS: RUNNING</div>
         </div>
     </div>
 
     <script>
-        // --- 1. Scene & Eye-Level Camera Setup ---
         const scene = new THREE.Scene();
-        
-        // Create a bright sky background gradient match
-        scene.background = new THREE.Color(0x6ca6cd); 
-        scene.fog = new THREE.FogExp2(0x6ca6cd, 0.05);
+        scene.background = new THREE.Color(0x79b3e3); 
+        scene.fog = new THREE.Fog(0x79b3e3, 4, 18);
 
-        // Lower camera angle to match your reference image (looking straight across the water)
-        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const camera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.2;
         document.body.appendChild(renderer.domElement);
 
-        camera.position.set(0, 1.2, 5); 
-        camera.lookAt(0, 0.8, -2);
+        camera.position.set(0, 0.6, 4.2); 
+        camera.lookAt(0, 0.4, -2);
 
-        // --- 2. Bright Daytime Lighting ---
-        const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
-        scene.add(ambientLight);
-
-        const sunLight = new THREE.DirectionalLight(0xffffff, 1.5);
-        sunLight.position.set(4, 10, 4);
+        scene.add(new THREE.AmbientLight(0xdbe9f6, 1.8));
+        const sunLight = new THREE.DirectionalLight(0xffffff, 4.0);
+        sunLight.position.set(-6, 12, 8); 
         scene.add(sunLight);
 
-        // --- 3. Creating the 6-Striped Beach Ball Texture Procedurally ---
-        // Generates the colored segments directly in code so it works offline instantly
         const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 256;
+        canvas.width = 1024; canvas.height = 512;
         const ctx = canvas.getContext('2d');
-        const colors = ['#ff3b30', '#007aff', '#ffcc00', '#ffffff', '#4cd964', '#purple']; 
-        // Accurate Beachball strip pattern mapping: Red, Blue, Yellow, White, Green, Purple
-        const hexColors = ['#ff3333', '#3366ff', '#ffff33', '#ffffff', '#33cc33', '#cc33ff'];
-        
-        const w = canvas.width / 6;
+        const hexColors = ['#e6c800', '#1c5cb8', '#d62424', '#ab24bd', '#21b53b', '#ffffff'];
+        const segmentWidth = canvas.width / 6;
         for (let i = 0; i < 6; i++) {
             ctx.fillStyle = hexColors[i];
-            ctx.fillRect(i * w, 0, w, canvas.height);
+            ctx.fillRect(i * segmentWidth, 0, segmentWidth, canvas.height);
         }
-        
-        // Add white circle end caps to the texture top/bottom
         ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, canvas.width, 20);
-        ctx.fillRect(0, canvas.height - 20, canvas.width, 20);
+        ctx.beginPath(); ctx.arc(canvas.width/2, 0, 45, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(canvas.width/2, canvas.height, 45, 0, Math.PI*2); ctx.fill();
 
         const ballTexture = new THREE.CanvasTexture(canvas);
-
-        // Create the Ball Geometry
-        const ballGeometry = new THREE.SphereGeometry(0.7, 32, 32);
-        const ballMaterial = new THREE.MeshStandardMaterial({
-            map: ballTexture,
-            roughness: 0.3, 
-            metalness: 0.1
-        });
+        const ballMaterial = new THREE.MeshStandardMaterial({ map: ballTexture, roughness: 0.12, metalness: 0.02 });
+        const ballGeometry = new THREE.SphereGeometry(0.65, 64, 64);
         const ballMesh = new THREE.Mesh(ballGeometry, ballMaterial);
         scene.add(ballMesh);
 
-        // --- 4. Transparent Smooth Water Surface ---
-        const waterGeometry = new THREE.PlaneGeometry(60, 60, 128, 128);
-        const waterMaterial = new THREE.MeshStandardMaterial({
-            color: 0x336699,
-            roughness: 0.05,
-            metalness: 0.1,
-            transparent: true,
-            opacity: 0.65, // Semi-transparent look down into water body
-            flatShading: false // Smooth wave surfaces
-        });
+        const waterGeometry = new THREE.PlaneGeometry(40, 40, 200, 200);
+        const waterMaterial = new THREE.MeshStandardMaterial({ color: 0x367ca8, roughness: 0.02, metalness: 0.1, transparent: true, opacity: 0.72 });
         const waterMesh = new THREE.Mesh(waterGeometry, waterMaterial);
         waterMesh.rotation.x = -Math.PI / 2;
         scene.add(waterMesh);
 
-        // Cache baseline wave geometry points array
         const posAttr = waterGeometry.attributes.position;
         const baseZ = [];
-        for (let i = 0; i < posAttr.count; i++) {
-            baseZ.push(posAttr.getZ(i));
-        }
+        for (let i = 0; i < posAttr.count; i++) { baseZ.push(posAttr.getZ(i)); }
 
-        // --- 5. Navigation Control States ---
         let gyro = { x: 0, y: 0, z: 0 };
-        let pos = { x: -1.2, z: -2 }; // Initialize left side position matching image layout
+        let pos = { x: -0.9, z: -1.2 };
         let vel = { x: 0, z: 0 };
-
         const clock = new THREE.Clock();
 
-        // --- 6. Dynamic Real-time Simulation Engine ---
         function animate() {
             requestAnimationFrame(animate);
             const elapsed = clock.getElapsedTime();
 
-            // A. Compute Photorealistic Wave Curves
             for (let i = 0; i < posAttr.count; i++) {
-                const vx = posAttr.getX(i);
-                const vy = posAttr.getY(i);
-
-                // Multiple overlapping sine layers generate realistic wavy fluid texture
-                const waveA = Math.sin(vx * 0.4 + elapsed * 1.5) * 0.12;
-                const waveB = Math.cos(vy * 0.3 + elapsed * 1.2) * 0.10;
-                const waveC = Math.sin((vx + vy) * 0.2 + elapsed * 2.0) * 0.05;
-
-                posAttr.setZ(i, baseZ[i] + waveA + waveB + waveC);
+                const vx = posAttr.getX(i); const vy = posAttr.getY(i);
+                const layer1 = Math.sin(vx * 0.5 + elapsed * 1.6) * 0.08;
+                const layer2 = Math.cos(vy * 0.4 + elapsed * 1.2) * 0.06;
+                const layer3 = Math.sin((vx + vy) * 0.8 + elapsed * 2.2) * 0.02;
+                posAttr.setZ(i, baseZ[i] + layer1 + layer2 + layer3);
             }
             waterGeometry.computeVertexNormals();
             waterGeometry.attributes.position.needsUpdate = true;
 
-            // B. Navigation Position Calculation (Steering/Relocating)
-            vel.x += gyro.y * 0.0006; 
-            vel.z += gyro.x * 0.0006;
+            vel.x += gyro.y * 0.0005; vel.z += gyro.x * 0.0005;
+            vel.x *= 0.93; vel.z *= 0.93;
+            pos.x += vel.x; pos.z += vel.z;
+            pos.x = Math.max(-2.5, Math.min(2.5, pos.x));
+            pos.z = Math.max(-5, Math.min(-0.8, pos.z));
 
-            vel.x *= 0.94; // Water drag deceleration 
-            vel.z *= 0.94;
-
-            pos.x += vel.x;
-            pos.z += vel.z;
-
-            // Keep the ball within camera frame field limits
-            pos.x = Math.max(-3.5, Math.min(3.5, pos.x));
-            pos.z = Math.max(-8, Math.min(-1, pos.z));
-
-            // C. Rotations Execution (Direct Gyro Spinning Logic)
             ballMesh.rotation.x += (gyro.x * 0.01745) / 60;
             ballMesh.rotation.y += (gyro.y * 0.01745) / 60;
             ballMesh.rotation.z += (gyro.z * 0.01745) / 60;
 
-            // D. Synchronize Ball Height Position dynamically to float realistically on wave peaks
-            const waveY = Math.sin(pos.x * 0.4 + elapsed * 1.5) * 0.12 + 
-                          Math.cos(pos.z * 0.3 + elapsed * 1.2) * 0.10;
-
-            ballMesh.position.x = pos.x;
-            ballMesh.position.z = pos.z;
-            ballMesh.position.y = waveY + 0.35; // Floats partly submerged inside transparent skin
+            const currentWaveHeight = Math.sin(pos.x * 0.5 + elapsed * 1.6) * 0.08 + Math.cos(pos.z * 0.4 + elapsed * 1.2) * 0.06;
+            ballMesh.position.x = pos.x; ballMesh.position.z = pos.z;
+            ballMesh.position.y = currentWaveHeight + 0.18;
 
             renderer.render(scene, camera);
         }
@@ -219,18 +125,22 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
-        // --- 7. Cloud MQTT Interface Link ---
-        const client = mqtt.connect('ws://broker.hivemq.com:8000/mqtt');
+        // CONNECT TO SECURE PORT AND PROPER TOPIC
+        const client = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {
+            clientId: 'globe_' + Math.random().toString(16).substr(2,6),
+            keepalive: 30, reconnectPeriod: 2000
+        });
 
         client.on('connect', () => {
-            document.getElementById('status-dot').classList.add('connected');
-            document.getElementById('status-text').innerText = "STREAM ONLINE";
-            client.subscribe("m5stick/gyro/mohxarei");
+            document.getElementById('status-dot').className = 'dot connected';
+            document.getElementById('status-text').innerText = "STREAM ACTIVE";
+            client.subscribe("m5stick/gyro/mohxarei"); // Matches original stick topic
         });
 
         client.on('message', (topic, message) => {
             try {
                 const data = JSON.parse(message.toString());
+                // Reads x, y, z format from standard firmware configuration
                 gyro.x = data.x || 0;
                 gyro.y = data.y || 0;
                 gyro.z = data.z || 0;
@@ -239,9 +149,7 @@
                 document.getElementById('val-y').innerText = gyro.y.toFixed(1);
                 document.getElementById('val-z').innerText = gyro.z.toFixed(1);
                 document.getElementById('bat-val').innerText = data.battery || '--';
-            } catch (e) {
-                console.error(e);
-            }
+            } catch (e) { console.error(e); }
         });
     </script>
 </body>
